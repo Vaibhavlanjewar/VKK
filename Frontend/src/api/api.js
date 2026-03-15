@@ -1,32 +1,37 @@
-require('dotenv').config(); 
-const express = require("express");
-const cors = require("cors");
-const productRoutes = require("./routes/productRoutes");
-const billRoutes = require("./routes/billRoutes");
-const aiRoutes = require("./routes/aiRoutes");
-const verifyFirebaseToken = require("./middleware/verifyFirebaseToken");
+import axios from 'axios';
+import { auth } from '../firebase/firebaseConfig';
 
-const app = express();
+const API = axios.create({
+  // Ensure the prefix is VITE_ and we handle the trailing slash
+  baseURL: (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:5000') + '/api',
+});
 
-app.use(cors({
-  origin: [
-    "https://vaibhav-krishi-kendra-b3d8.vercel.app",
-    "https://vaibhav-krishi-kendra.vercel.app",
-    "http://localhost:5173" 
-  ],
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
-}));
+// DEBUG: This will show in your browser console to verify the URL
+console.log("Current API Base URL:", API.defaults.baseURL);
 
-app.use(express.json());
+API.interceptors.request.use(async (config) => {
+  let user = auth.currentUser;
 
-// Public health check
-app.get("/", (req, res) => res.send("Vaibhav Krishi Kendra API Active 🚀"));
+  // Wait for Firebase to initialize if user is null
+  if (!user) {
+    user = await new Promise((resolve) => {
+      const unsubscribe = auth.onAuthStateChanged((u) => {
+        unsubscribe();
+        resolve(u);
+      });
+      // Safety: stop waiting after 4 seconds
+      setTimeout(() => resolve(null), 4000);
+    });
+  }
 
-// Apply verification to all /api routes
-app.use("/api/products", verifyFirebaseToken, productRoutes);
-app.use("/api/bills", verifyFirebaseToken, billRoutes);
-app.use("/api/ai", verifyFirebaseToken, aiRoutes);
+  if (user) {
+    const token = await user.getIdToken();
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`✅ Server on port ${PORT}`));
+export default API;
