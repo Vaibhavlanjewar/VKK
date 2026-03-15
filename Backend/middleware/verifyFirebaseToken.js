@@ -1,44 +1,40 @@
 const admin = require("firebase-admin");
-// Ensure the path and file name match your actual config file exactly
 const { adminPhones, adminEmails } = require("../config/adminPhones");
 
 const verifyFirebaseToken = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+  const token = req.headers.authorization?.split("Bearer ")[1];
 
   if (!token) {
-    return res.status(401).json({ message: "No token provided. Please log in." });
+    return res.status(401).json({ message: "No token provided" });
   }
 
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
 
-    // Extract identifiers from the decoded token
-    const phoneNumber = decodedToken.phone_number;
-    const email = decodedToken.email;
+    // 1. Get the email and phone from the token
+    // 2. Convert them to lowercase and remove any accidental spaces
+    const userEmail = decodedToken.email ? decodedToken.email.toLowerCase().trim() : null;
+    const userPhone = decodedToken.phone_number ? decodedToken.phone_number.trim() : null;
 
-    // Safety Check: Ensure the arrays exist before calling .includes()
-    const validPhones = Array.isArray(adminPhones) ? adminPhones : [];
-    const validEmails = Array.isArray(adminEmails) ? adminEmails : [];
+    // 3. Clean your admin list as well (just in case)
+    const cleanAdminEmails = adminEmails.map(email => email.toLowerCase().trim());
 
-    // Check if the user's phone OR email is in the authorized admin lists
-    const isPhoneAdmin = phoneNumber && validPhones.includes(phoneNumber);
-    const isEmailAdmin = email && validEmails.includes(email);
+    const isEmailAdmin = userEmail && cleanAdminEmails.includes(userEmail);
+    const isPhoneAdmin = userPhone && adminPhones.includes(userPhone);
 
-    if (!isPhoneAdmin && !isEmailAdmin) {
-      console.warn(`Unauthorized access attempt: ${email || phoneNumber}`);
+    if (!isEmailAdmin && !isPhoneAdmin) {
+      console.warn(`Blocked access for: ${userEmail || userPhone}`);
       return res.status(403).json({
-        message: "Access denied. You are not authorized as an admin for Vaibhav Krishi Kendra."
+        message: "Access denied. User not authorized."
       });
     }
 
-    // Attach user info to the request and proceed
     req.user = decodedToken;
     next();
 
   } catch (error) {
-    console.error("Auth Middleware Error:", error.message);
-    return res.status(401).json({ message: "Session expired or invalid token." });
+    console.error("Auth Error:", error.message);
+    return res.status(401).json({ message: "Invalid token" });
   }
 };
 
