@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { auth } from '../firebase/firebaseConfig'; // Ensure this path is correct
+import { auth } from '../firebase/firebaseConfig';
 import API from '../api/api';
 
 const Dashboard = () => {
@@ -13,9 +13,7 @@ const Dashboard = () => {
 
   const loadDashboardData = useCallback(async () => {
     try {
-      setLoading(true);
-      
-      // Fetching all data using your configured Axios instance (API)
+      // Don't wrap the whole thing in setLoading(true) if we are already loading
       const [allProdRes, billsRes, lowRes, expRes] = await Promise.all([
         API.get("/products"),
         API.get("/bills"),
@@ -23,7 +21,6 @@ const Dashboard = () => {
         API.get("/products-expiring")
       ]);
 
-      // 1. Process Products & Stats
       const products = allProdRes.data ? Object.values(allProdRes.data) : [];
       const lowStock = lowRes.data ? Object.values(lowRes.data) : [];
       const expiring = expRes.data ? Object.values(expRes.data) : [];
@@ -34,14 +31,17 @@ const Dashboard = () => {
         expiringList: expiring
       });
 
-      // 2. Process Bills & Financials
       const bills = billsRes.data ? Object.values(billsRes.data) : [];
       calculateFinancials(bills);
 
     } catch (err) {
       console.error("Dashboard Fetch Error:", err);
+      // If we get a 403 or 401, we should probably show the user they aren't an admin
+      if (err.response?.status === 403) {
+        alert("Access Denied: You are not authorized as an Admin.");
+      }
     } finally {
-      setLoading(false);
+      setLoading(false); // ALWAYS stop loading regardless of success or failure
     }
   }, []);
 
@@ -54,13 +54,10 @@ const Dashboard = () => {
       const amount = Number(bill.total) || 0;
       if (isNaN(billDate.getTime())) return;
 
-      // Daily
       if (billDate.toDateString() === now.toDateString()) d += amount;
-      // Monthly
       if (billDate.getMonth() === now.getMonth() && billDate.getFullYear() === now.getFullYear()) m += amount;
-      // Yearly
       if (billDate.getFullYear() === now.getFullYear()) y += amount;
-      // Weekly (Last 7 days)
+      
       const diffDays = (now - billDate) / (1000 * 60 * 60 * 24);
       if (diffDays >= 0 && diffDays <= 7) w += amount;
     });
@@ -69,13 +66,15 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    // This listener is critical: it waits for Firebase to initialize the user
-    const unsubscribe = auth.onAuthStateChanged((user) => {
+    // onAuthStateChanged is the best way to handle refreshes
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
-        loadDashboardData();
+        console.log("Logged in as:", user.email);
+        await loadDashboardData();
       } else {
-        // If not logged in after 2 seconds, stop the loading spinner
-        setTimeout(() => setLoading(false), 2000);
+        // If no user is found after 3 seconds, stop the spinner so 
+        // they can see the empty dashboard or login prompt
+        setTimeout(() => setLoading(false), 3000);
       }
     });
 
@@ -84,9 +83,10 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="container" style={{ textAlign: 'center', marginTop: '50px' }}>
-        <h2 className="text-dim">Syncing Vaibhav Krishi Kendra Data...</h2>
-        <div className="loader"></div> 
+      <div className="container" style={{ textAlign: 'center', marginTop: '100px' }}>
+        <h2 className="text-dim">Syncing Vaibhav Krishi Kendra...</h2>
+        <p>Verifying Admin Credentials</p>
+        <div className="loader" style={{ margin: '20px auto' }}></div> 
       </div>
     );
   }
@@ -95,7 +95,7 @@ const Dashboard = () => {
     <div className="container">
       <div className="header-flex" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '25px', alignItems: 'center' }}>
         <h2 style={{ fontWeight: '800' }}>Executive Overview</h2>
-        <button className="btn-edit" onClick={loadDashboardData} style={{ width: 'auto', padding: '10px 20px' }}>
+        <button className="btn-edit" onClick={() => { setLoading(true); loadDashboardData(); }} style={{ width: 'auto', padding: '10px 20px' }}>
           ↻ Refresh Metrics
         </button>
       </div>
@@ -139,7 +139,6 @@ const Dashboard = () => {
 
       {/* Detailed Lists Section */}
       <div className="inventory-details-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginTop: '30px' }}>
-        {/* Low Stock Table */}
         <div className="card list-card">
           <div className="list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3>Stock Alerts</h3>
@@ -151,18 +150,17 @@ const Dashboard = () => {
             <table className="mini-table" style={{ width: '100%', marginTop: '10px' }}>
               <thead><tr><th align="left">Product</th><th align="right">Stock</th></tr></thead>
               <tbody>
-                {inventory.lowStockList.map((item, idx) => (
+                {inventory.lowStockList.length > 0 ? inventory.lowStockList.map((item, idx) => (
                   <tr key={idx}>
                     <td>{item.product || item.name}</td>
                     <td align="right" style={{ color: '#e74c3c', fontWeight: 'bold' }}>{item.stock} {item.unit}</td>
                   </tr>
-                ))}
+                )) : <tr><td colSpan="2" style={{textAlign: 'center', padding: '20px'}}>All stock levels healthy</td></tr>}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* Expiring Table */}
         <div className="card list-card">
           <div className="list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3>Expiry Alerts</h3>
@@ -174,12 +172,12 @@ const Dashboard = () => {
             <table className="mini-table" style={{ width: '100%', marginTop: '10px' }}>
               <thead><tr><th align="left">Product</th><th align="right">Expiry</th></tr></thead>
               <tbody>
-                {inventory.expiringList.map((item, idx) => (
+                {inventory.expiringList.length > 0 ? inventory.expiringList.map((item, idx) => (
                   <tr key={idx}>
                     <td>{item.product || item.name}</td>
                     <td align="right" style={{ color: '#f39c12' }}>{new Date(item.expiry).toLocaleDateString()}</td>
                   </tr>
-                ))}
+                )) : <tr><td colSpan="2" style={{textAlign: 'center', padding: '20px'}}>No upcoming expiries</td></tr>}
               </tbody>
             </table>
           </div>
