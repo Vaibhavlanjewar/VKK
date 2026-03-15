@@ -5,7 +5,9 @@ const adminPhones = [
 
 const adminEmails = [
   "vlanjewar523@gmail.com", // Vaibhav Google Access
-  "pramodlanjewar@hotmail.com"
+  "pramodlanjewar@hotmail.com",
+  "pramodlanjewar0101@gmail.com",
+  
 ];
 
 module.exports = { adminPhones, adminEmails };
