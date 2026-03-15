@@ -1,0 +1,16 @@
+#root {
+  width: 1126px; /* Forces a specific width */
+  max-width: 100%;
+  margin: 0 auto;
+  text-align: center; /* Centers all text, including forms and tables */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Utility to center the login card if the screen looks empty */
+.login-page-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 80vh;
+}
