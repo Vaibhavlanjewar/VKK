@@ -1,4 +1,4 @@
-const db = require("../firebase/firebaseConfig");
+const { db } = require("../firebase/firebaseConfig");
 const crypto = require("crypto"); // Standard Node module - fixes ERR_REQUIRE_ESM
 
 // ADD PRODUCT

@@ -23,14 +23,24 @@ const app = express();
 // }));
 
 app.use(cors({
-  origin: [
-    "https://vaibhav-krishi-kendra-b3d8.vercel.app", // Preview URL
-    "https://vaibhav-krishi-kendra.vercel.app",      // Production URL
-    "http://localhost:5173"                          // Local Testing
-  ],
+  origin: (origin, callback) => {
+    // Allow any localhost port for local development
+    if (!origin || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+      return callback(null, true);
+    }
+    const allowedOrigins = [
+      "https://vaibhav-krishi-kendra-b3d8.vercel.app",
+      "https://vaibhav-krishi-kendra.vercel.app",
+    ];
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
+
 
 app.use(express.json());
 
@@ -43,9 +53,10 @@ app.get("/", (req, res) => {
  * Note: If your productRoutes.js defines router.get("/products"), 
  * using "/api" here makes the final URL: [YOUR_URL]/api/products
  */
-app.use("/api", verifyFirebaseToken, productRoutes);
-app.use("/api", verifyFirebaseToken, billRoutes);
-app.use("/api/ai", verifyFirebaseToken, aiRoutes);
+// Protected API routes - auth is applied inside each route file
+app.use("/api", productRoutes);
+app.use("/api", billRoutes);
+app.use("/api/ai", aiRoutes);
 
 // 4. GLOBAL ERROR HANDLER (Helps debug 500 errors in Vercel logs)
 app.use((err, req, res, next) => {

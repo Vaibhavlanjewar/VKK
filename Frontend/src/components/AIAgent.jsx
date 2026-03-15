@@ -91,7 +91,7 @@ const AIAgent = () => {
                   📥
                 </button>
               )}
-              <button onClick={() => { setSummary(""); handleAction(); }} className="refresh-btn" disabled={loading}>
+              <button onClick={() => { if (!loading) { setSummary(""); handleAction(null); } }} className="refresh-btn" disabled={loading}>
                 {loading ? "..." : "🔄"}
               </button>
             </div>

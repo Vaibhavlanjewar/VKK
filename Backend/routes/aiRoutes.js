@@ -1,11 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const { getSummary, askQuestion } = require("../controllers/aiController");
+const verifyFirebaseToken = require("../middleware/verifyFirebaseToken");
 
-// This handles the automatic summary (GET)
-router.get("/summary", getSummary);
+router.get("/summary", verifyFirebaseToken, getSummary);
+router.post("/ask", verifyFirebaseToken, askQuestion);
 
-// This handles the new Prompt Box (POST) <-- THIS IS LIKELY MISSING
-router.post("/ask", askQuestion); 
-
-module.exports = router;
+module.exports = router;

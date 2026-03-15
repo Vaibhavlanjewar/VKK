@@ -1,4 +1,4 @@
-const db = require("../firebase/firebaseConfig");
+const { db } = require("../firebase/firebaseConfig");
 const PDFDocument = require("pdfkit");
 
 /**

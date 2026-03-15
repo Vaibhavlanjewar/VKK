@@ -2,4 +2,7 @@
 .env.local
 node_modules/
 dist/
+serviceAccountKey.json
+*serviceAccount*.json
+
 

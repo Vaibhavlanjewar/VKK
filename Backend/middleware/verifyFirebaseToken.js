@@ -2,7 +2,10 @@ const admin = require("firebase-admin");
 const { adminPhones, adminEmails } = require("../config/adminPhones");
 
 const verifyFirebaseToken = async (req, res, next) => {
-  const token = req.headers.authorization?.split("Bearer ")[1];
+  // Support token from Authorization header OR query param (needed for PDF window.open)
+  const headerToken = req.headers.authorization?.split("Bearer ")[1];
+  const queryToken = req.query.token;
+  const token = headerToken || queryToken;
 
   if (!token) {
     return res.status(401).json({ message: "No token provided" });

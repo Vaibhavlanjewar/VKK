@@ -1,34 +1,30 @@
 require('dotenv').config();
 const admin = require("firebase-admin");
 
-const getPrivateKey = () => {
-    let key = process.env.FIREBASE_PRIVATE_KEY;
-    if (!key) return undefined;
-
-    // 1. Remove all quotes and trim whitespace
-    key = key.replace(/['"]/g, '').trim();
-
-    // 2. Convert text \n into actual newline characters
-    key = key.replace(/\\n/g, '\n');
-
-    // 3. Remove existing headers/footers to clean out hidden spaces
-    key = key.replace(/-----BEGIN PRIVATE KEY-----/g, '');
-    key = key.replace(/-----END PRIVATE KEY-----/g, '');
-    key = key.replace(/\s/g, ''); // Remove all spaces/tabs/newlines from the middle
-
-    // 4. Rebuild the key with perfect formatting
-    // Every 64 characters should technically be a newline, 
-    // but the SDK is usually fine with the headers + one big block
-    const cleanKey = `-----BEGIN PRIVATE KEY-----\n${key}\n-----END PRIVATE KEY-----\n`;
-    
-    return cleanKey;
-};
-
+/**
+ * Firebase Admin SDK initialization using environment variables.
+ * All credentials come from .env (or host platform env vars for deployment).
+ * 
+ * The private key is stored in .env with literal \n characters.
+ * The replace() call converts them to real newlines required by the PEM format.
+ */
 const serviceAccount = {
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: getPrivateKey(),
+    type: process.env.FIREBASE_TYPE || "service_account",
+    project_id: process.env.FIREBASE_PROJECT_ID,
+    private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+    private_key: (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
+    client_email: process.env.FIREBASE_CLIENT_EMAIL,
+    client_id: process.env.FIREBASE_CLIENT_ID,
+    auth_uri: "https://accounts.google.com/o/oauth2/auth",
+    token_uri: "https://oauth2.googleapis.com/token",
+    auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+    client_x509_cert_url: process.env.FIREBASE_CLIENT_EMAIL
+        ? `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(process.env.FIREBASE_CLIENT_EMAIL)}`
+        : "",
+    universe_domain: "googleapis.com"
 };
+
+let db, auth;
 
 try {
     if (!admin.apps.length) {
@@ -38,14 +34,11 @@ try {
         });
         console.log("✅ Firebase Admin SDK connected successfully!");
     }
+    db = admin.database();
+    auth = admin.auth();
 } catch (error) {
     console.error("❌ Firebase Admin Initialization Error:", error.message);
-    // Log the first few characters of the key (for debugging only, remove later)
-    if (serviceAccount.privateKey) {
-        console.log("Key begins with:", serviceAccount.privateKey.substring(0, 40));
-    }
+    console.error("   Check that all FIREBASE_* variables are set correctly in your .env");
 }
 
-const db = admin.database();
-const auth = admin.auth();
 module.exports = { admin, db, auth };
