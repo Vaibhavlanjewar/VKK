@@ -7,6 +7,7 @@ const adminEmails = [
   "vlanjewar523@gmail.com", // Vaibhav Google Access
   "pramodlanjewar@hotmail.com",
   "pramodlanjewar0101@gmail.com",
+  "vnblcp@gmail.com",
   
 ];
 
