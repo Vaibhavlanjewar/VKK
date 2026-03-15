@@ -12,28 +12,48 @@ const verifyFirebaseToken = require("./middleware/verifyFirebaseToken");
 
 const app = express();
 
-// Update CORS to allow your Vercel Frontend
+// 1. IMPROVED CORS: Allow the specific frontend and localhost for testing
+// app.use(cors({
+//   origin: [
+//     "https://vaibhav-krishi-kendra-b3d8.vercel.app",
+//     "http://localhost:5173" 
+//   ],
+//   methods: ["GET", "POST", "PUT", "DELETE"],
+//   credentials: true
+// }));
+
 app.use(cors({
-  origin: "https://vaibhav-krishi-kendra-b3d8.vercel.app"
+  origin: [
+    "https://vaibhav-krishi-kendra-b3d8.vercel.app", // Preview URL
+    "https://vaibhav-krishi-kendra.vercel.app",      // Production URL
+    "http://localhost:5173"                          // Local Testing
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
 }));
 
 app.use(express.json());
 
-// Root test route (Public)
+// 2. PUBLIC TEST ROUTE
 app.get("/", (req, res) => {
-  res.send("Krishi Kendra Backend Running 🚀");
+  res.send("Vaibhav Krishi Kendra Backend is Live 🚀");
 });
 
-/** * PROTECT ROUTES
- * By adding verifyFirebaseToken here, every request to products, bills, or AI
- * MUST come from an email in your adminEmails list.
+/** * 3. PROTECTED API ROUTES
+ * Note: If your productRoutes.js defines router.get("/products"), 
+ * using "/api" here makes the final URL: [YOUR_URL]/api/products
  */
 app.use("/api", verifyFirebaseToken, productRoutes);
 app.use("/api", verifyFirebaseToken, billRoutes);
 app.use("/api/ai", verifyFirebaseToken, aiRoutes);
 
-const PORT = process.env.PORT || 5000;
+// 4. GLOBAL ERROR HANDLER (Helps debug 500 errors in Vercel logs)
+app.use((err, req, res, next) => {
+  console.error("SERVER ERROR:", err.stack);
+  res.status(500).json({ error: "Internal Server Error", details: err.message });
+});
 
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
