@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { auth } from '../firebase/firebaseConfig'; // Ensure this path is correct
 import API from '../api/api';
 
 const Dashboard = () => {
@@ -13,7 +14,8 @@ const Dashboard = () => {
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      // Fetching all data from your specific backend routes
+      
+      // Fetching all data using your configured Axios instance (API)
       const [allProdRes, billsRes, lowRes, expRes] = await Promise.all([
         API.get("/products"),
         API.get("/bills"),
@@ -67,23 +69,42 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    loadDashboardData();
+    // This listener is critical: it waits for Firebase to initialize the user
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        loadDashboardData();
+      } else {
+        // If not logged in after 2 seconds, stop the loading spinner
+        setTimeout(() => setLoading(false), 2000);
+      }
+    });
+
+    return () => unsubscribe();
   }, [loadDashboardData]);
 
-  if (loading) return <div className="container"><h2 className="text-dim">Syncing Data...</h2></div>;
+  if (loading) {
+    return (
+      <div className="container" style={{ textAlign: 'center', marginTop: '50px' }}>
+        <h2 className="text-dim">Syncing Vaibhav Krishi Kendra Data...</h2>
+        <div className="loader"></div> 
+      </div>
+    );
+  }
 
   return (
     <div className="container">
-      <div className="header-flex" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '25px' }}>
+      <div className="header-flex" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '25px', alignItems: 'center' }}>
         <h2 style={{ fontWeight: '800' }}>Executive Overview</h2>
-        <button className="btn-edit" onClick={loadDashboardData} style={{ width: 'auto' }}>↻ Refresh Metrics</button>
+        <button className="btn-edit" onClick={loadDashboardData} style={{ width: 'auto', padding: '10px 20px' }}>
+          ↻ Refresh Metrics
+        </button>
       </div>
 
       {/* Financial Grid */}
-      <div className="dashboard-grid">
+      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
         <div className="card income-card">
           <label>Today's Sales</label>
-          <h1 className="price-text">₹{income.daily.toLocaleString('en-IN')}</h1>
+          <h1 className="price-text" style={{ color: '#2ecc71' }}>₹{income.daily.toLocaleString('en-IN')}</h1>
         </div>
         <div className="card income-card">
           <label>Weekly Sales</label>
@@ -101,37 +122,39 @@ const Dashboard = () => {
 
       {/* Inventory Stats */}
       <h2 style={{ marginTop: '40px', marginBottom: '20px' }}>Inventory Intelligence</h2>
-      <div className="dashboard-grid">
+      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
         <div className="card">
           <label>Total Catalog</label>
-          <h1>{inventory.totalCount} <small style={{fontSize: '0.8rem', color: 'var(--text-dim)'}}>Items</small></h1>
+          <h1>{inventory.totalCount} <small style={{fontSize: '0.8rem', color: 'gray'}}>Items</small></h1>
         </div>
-        <div className="card" style={{ borderLeft: '5px solid var(--warning)' }}>
-          <label style={{ color: 'var(--warning)' }}>Critically Low</label>
-          <h1 className="text-warning">{inventory.lowStockList.length}</h1>
+        <div className="card" style={{ borderLeft: '5px solid #f1c40f' }}>
+          <label style={{ color: '#f1c40f' }}>Critically Low</label>
+          <h1 style={{ color: '#f1c40f' }}>{inventory.lowStockList.length}</h1>
         </div>
-        <div className="card" style={{ borderLeft: '5px solid var(--danger)' }}>
-          <label style={{ color: 'var(--danger)' }}>Expiring (30 Days)</label>
-          <h1 className="text-danger">{inventory.expiringList.length}</h1>
+        <div className="card" style={{ borderLeft: '5px solid #e74c3c' }}>
+          <label style={{ color: '#e74c3c' }}>Expiring (30 Days)</label>
+          <h1 style={{ color: '#e74c3c' }}>{inventory.expiringList.length}</h1>
         </div>
       </div>
 
       {/* Detailed Lists Section */}
-      <div className="inventory-details-grid">
+      <div className="inventory-details-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginTop: '30px' }}>
         {/* Low Stock Table */}
         <div className="card list-card">
-          <div className="list-header">
+          <div className="list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3>Stock Alerts</h3>
-            <span className="badge-warning">{inventory.lowStockList.length} Items</span>
+            <span style={{ backgroundColor: '#f1c40f', color: '#000', padding: '2px 8px', borderRadius: '5px', fontSize: '0.8rem' }}>
+              {inventory.lowStockList.length} Items
+            </span>
           </div>
-          <div className="scroll-area">
-            <table className="mini-table">
-              <thead><tr><th>Product Name</th><th>Stock Left</th></tr></thead>
+          <div className="scroll-area" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+            <table className="mini-table" style={{ width: '100%', marginTop: '10px' }}>
+              <thead><tr><th align="left">Product</th><th align="right">Stock</th></tr></thead>
               <tbody>
-                {inventory.lowStockList.map(item => (
-                  <tr key={item.id}>
+                {inventory.lowStockList.map((item, idx) => (
+                  <tr key={idx}>
                     <td>{item.product || item.name}</td>
-                    <td className="text-danger">{item.stock} {item.unit}</td>
+                    <td align="right" style={{ color: '#e74c3c', fontWeight: 'bold' }}>{item.stock} {item.unit}</td>
                   </tr>
                 ))}
               </tbody>
@@ -141,18 +164,20 @@ const Dashboard = () => {
 
         {/* Expiring Table */}
         <div className="card list-card">
-          <div className="list-header">
+          <div className="list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3>Expiry Alerts</h3>
-            <span className="badge-danger">{inventory.expiringList.length} Items</span>
+            <span style={{ backgroundColor: '#e74c3c', color: '#fff', padding: '2px 8px', borderRadius: '5px', fontSize: '0.8rem' }}>
+              {inventory.expiringList.length} Items
+            </span>
           </div>
-          <div className="scroll-area">
-            <table className="mini-table">
-              <thead><tr><th>Product Name</th><th>Expiry Date</th></tr></thead>
+          <div className="scroll-area" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+            <table className="mini-table" style={{ width: '100%', marginTop: '10px' }}>
+              <thead><tr><th align="left">Product</th><th align="right">Expiry</th></tr></thead>
               <tbody>
-                {inventory.expiringList.map(item => (
-                  <tr key={item.id}>
+                {inventory.expiringList.map((item, idx) => (
+                  <tr key={idx}>
                     <td>{item.product || item.name}</td>
-                    <td className="text-warning">{new Date(item.expiry).toLocaleDateString()}</td>
+                    <td align="right" style={{ color: '#f39c12' }}>{new Date(item.expiry).toLocaleDateString()}</td>
                   </tr>
                 ))}
               </tbody>
