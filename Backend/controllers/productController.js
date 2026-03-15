@@ -1,10 +1,10 @@
 const db = require("../firebase/firebaseConfig");
-const crypto = require("crypto"); // Native Node.js module, no crash on Vercel
+const crypto = require("crypto"); // Standard Node module - fixes ERR_REQUIRE_ESM
 
 // ADD PRODUCT
 exports.addProduct = async (req, res) => {
   try {
-    // Generates a secure unique ID (v4 equivalent)
+    // Generate a secure unique ID (UUID v4) natively
     const productId = crypto.randomUUID(); 
 
     const product = {
