@@ -9,7 +9,7 @@ const Billing = () => {
   const [invoiceId, setInvoiceId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [loading, setLoading] = useState(true); // Added loading state
+  const [loading, setLoading] = useState(true);
   const [customer, setCustomer] = useState({ name: "", mobile: "" });
 
   const fetchProducts = useCallback(async () => {
@@ -24,39 +24,40 @@ const Billing = () => {
     }
   }, []);
 
-  // WAIT FOR AUTH BEFORE FETCHING
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         fetchProducts();
       } else {
-        // Stop loading after 3 seconds if no user found
-        setTimeout(() => setLoading(false), 3000);
+        const timer = setTimeout(() => setLoading(false), 3000);
+        return () => clearTimeout(timer);
       }
     });
     return () => unsubscribe();
   }, [fetchProducts]);
 
   const filteredProducts = useMemo(() => {
+    const term = searchTerm.toLowerCase();
     return products.filter(p => 
-      p.product?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.brand?.toLowerCase().includes(searchTerm.toLowerCase())
+      p.product?.toLowerCase().includes(term) ||
+      p.brand?.toLowerCase().includes(term)
     );
   }, [products, searchTerm]);
 
   const addToCart = useCallback((product) => {
     if (invoiceId) return;
     const pId = product.id || product._id;
+    
     if (Number(product.stock) <= 0) { 
-      alert("Out of stock!"); 
+      alert("⚠️ Out of stock!"); 
       return; 
     }
 
     setCart(prevCart => {
       const existing = prevCart.find(item => (item.id || item._id) === pId);
       if (existing) {
-        if (existing.qty >= product.stock) {
-          alert("Cannot exceed available stock");
+        if (existing.qty >= Number(product.stock)) {
+          alert("⚠️ Insufficient stock available.");
           return prevCart;
         }
         return prevCart.map(item => (item.id || item._id) === pId ? { ...item, qty: item.qty + 1 } : item);
@@ -69,7 +70,12 @@ const Billing = () => {
     setCart(prev => prev.map(item => {
       if ((item.id || item._id) === id) {
         const newQty = item.qty + delta;
-        if (newQty > 0 && newQty <= Number(item.stock)) return { ...item, qty: newQty };
+        // Verify against stock
+        if (newQty > 0 && newQty <= Number(item.stock)) {
+          return { ...item, qty: newQty };
+        } else if (newQty > Number(item.stock)) {
+          alert("Maximum stock reached");
+        }
       }
       return item;
     }));
@@ -81,7 +87,7 @@ const Billing = () => {
 
   const handleCheckout = async () => {
     if (isProcessing || cart.length === 0) return;
-    if (!customer.name.trim()) { alert("Enter customer name"); return; }
+    if (!customer.name.trim()) { alert("Please enter Customer Name"); return; }
 
     setIsProcessing(true);
     try {
@@ -92,7 +98,7 @@ const Billing = () => {
           id: i.id || i._id, 
           product: i.product,
           quantity: i.qty,
-          selling: i.selling,
+          selling: Number(i.selling),
           wt: i.wt,
           unit: i.unit
         })),
@@ -101,10 +107,12 @@ const Billing = () => {
       
       const res = await API.post("/bills", payload);
       setInvoiceId(res.data.bill.invoiceNumber);
-      alert("Bill Generated Successfully!");
-      fetchProducts(); // Refresh stock after sale
+      alert("✅ Bill Generated: " + res.data.bill.invoiceNumber);
+      
+      // Refresh stock immediately
+      await fetchProducts(); 
     } catch (err) {
-      alert(err.response?.data?.error || "Checkout Failed");
+      alert(err.response?.data?.error || "Checkout Failed. Check stock availability.");
     } finally {
       setIsProcessing(false);
     }
@@ -116,18 +124,28 @@ const Billing = () => {
       const user = auth.currentUser;
       const token = user ? await user.getIdToken() : "";
       
-      // FIXED: Use the Vercel Backend URL instead of localhost
-      const backendBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      window.open(`${backendBaseUrl}/api/bills/${invoiceId}/pdf?token=${token}`, "_blank");
+      // Handle trailing slashes in Vercel URLs
+      const baseUrl = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || "http://localhost:5000");
+      
+      // Open PDF in new tab
+      const pdfUrl = `${baseUrl}/api/bills/${invoiceId}/pdf?token=${token}`;
+      window.open(pdfUrl, "_blank");
     } catch (err) { 
-      alert("Error downloading PDF"); 
+      alert("Error generating PDF preview."); 
     }
+  };
+
+  const resetBilling = () => {
+    setCart([]);
+    setInvoiceId(null);
+    setCustomer({ name: "", mobile: "" });
+    setSearchTerm("");
   };
 
   if (loading) {
     return (
       <div className="container" style={{ textAlign: 'center', marginTop: '100px' }}>
-        <h2 className="text-dim">Initialising Billing Engine...</h2>
+        <h2 className="text-dim">Initializing Billing Engine...</h2>
         <div className="loader" style={{ margin: '20px auto' }}></div>
       </div>
     );
@@ -135,48 +153,57 @@ const Billing = () => {
 
   return (
     <div className="container">
-      <div className="billing-container">
-        <div className="selection-section">
+      <div className="billing-container" style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+        
+        <div className="selection-section" style={{ flex: 2, minWidth: '350px' }}>
+          {/* Customer Inputs */}
           <div className="customer-info" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
             <input type="text" placeholder="👤 Customer Name" value={customer.name} 
               onChange={(e) => setCustomer({...customer, name: e.target.value})} disabled={invoiceId}
-              style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', flex: 1, background: 'var(--card-bg)', color: 'white' }}
+              style={{ padding: '12px', borderRadius: '8px', border: '1px solid #333', flex: 1, background: '#1a1a1a', color: 'white' }}
             />
-            <input type="text" placeholder="📞 Mobile (Optional)" value={customer.mobile} 
+            <input type="text" placeholder="📞 Mobile" value={customer.mobile} 
               onChange={(e) => setCustomer({...customer, mobile: e.target.value})} disabled={invoiceId}
-              style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', flex: 1, background: 'var(--card-bg)', color: 'white' }}
+              style={{ padding: '12px', borderRadius: '8px', border: '1px solid #333', flex: 1, background: '#1a1a1a', color: 'white' }}
             />
           </div>
 
+          {/* Search Bar */}
           <div className="search-bar" style={{ marginBottom: '20px' }}>
-            <input type="text" placeholder="🔍 Search by Product or Brand..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ width: '100%', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card-bg)', color: 'white' }}
+            <input type="text" placeholder="🔍 Search Products..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ width: '100%', padding: '15px', borderRadius: '8px', border: '1px solid #333', background: '#1a1a1a', color: 'white' }}
             />
           </div>
 
-          <div className="dashboard-grid">
-            {filteredProducts.map(p => (
-              <div key={p.id || p._id} className="card product-card" 
-                onClick={() => (!invoiceId && Number(p.stock) > 0) && addToCart(p)}
-                style={{ 
-                  opacity: (Number(p.stock) <= 0 || invoiceId) ? 0.6 : 1,
-                  cursor: (Number(p.stock) <= 0 || invoiceId) ? 'not-allowed' : 'pointer',
-                  border: '1px solid var(--border)' 
-                }}>
-                <h4 style={{ margin: '0 0 10px 0' }}>{p.product}</h4>
-                <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem' }}>{p.brand}</p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
-                   <span style={{ fontWeight: 'bold', color: 'var(--primary-green)' }}>₹{p.selling}</span>
-                   <span style={{ fontSize: '0.8rem', color: Number(p.stock) < 5 ? 'var(--danger)' : 'var(--text-dim)' }}>
-                     Stock: {p.stock}
-                   </span>
+          {/* Product Grid */}
+          <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '15px' }}>
+            {filteredProducts.map(p => {
+              const outOfStock = Number(p.stock) <= 0;
+              return (
+                <div key={p.id || p._id} className="card product-card" 
+                  onClick={() => (!invoiceId && !outOfStock) && addToCart(p)}
+                  style={{ 
+                    opacity: (outOfStock || invoiceId) ? 0.5 : 1,
+                    cursor: (outOfStock || invoiceId) ? 'not-allowed' : 'pointer',
+                    border: outOfStock ? '1px solid #e74c3c' : '1px solid #333',
+                    transition: '0.2s'
+                  }}>
+                  <h4 style={{ margin: '0 0 5px 0' }}>{p.product}</h4>
+                  <small style={{ color: '#888' }}>{p.brand}</small>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+                     <span style={{ fontWeight: 'bold', color: '#2ecc71' }}>₹{p.selling}</span>
+                     <span style={{ fontSize: '0.75rem', color: outOfStock ? '#e74c3c' : '#888' }}>
+                       {outOfStock ? 'OUT OF STOCK' : `Stock: ${p.stock}`}
+                     </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 
-        <div className="cart-sticky-wrapper">
+        {/* Cart Section */}
+        <div className="cart-sticky-wrapper" style={{ flex: 1, minWidth: '300px' }}>
           <Cart 
             cart={cart} 
             updateQty={updateQty} 
@@ -187,11 +214,7 @@ const Billing = () => {
             isProcessing={isProcessing}
             customerName={customer.name} 
             mobile={customer.mobile}
-            resetBilling={() => { // Helper to start a new bill
-                setCart([]);
-                setInvoiceId(null);
-                setCustomer({ name: "", mobile: "" });
-            }}
+            resetBilling={resetBilling}
           />
         </div>
       </div>

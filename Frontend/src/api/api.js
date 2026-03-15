@@ -1,34 +1,32 @@
-import axios from 'axios';
-import { auth } from '../firebase/firebaseConfig';
+require('dotenv').config(); 
+const express = require("express");
+const cors = require("cors");
+const productRoutes = require("./routes/productRoutes");
+const billRoutes = require("./routes/billRoutes");
+const aiRoutes = require("./routes/aiRoutes");
+const verifyFirebaseToken = require("./middleware/verifyFirebaseToken");
 
-const API = axios.create({
-  // Cleanly handle the URL formatting
-  baseURL: (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:5000') + '/api',
-});
+const app = express();
 
-API.interceptors.request.use(async (config) => {
-  // 1. Check if user is already loaded
-  let user = auth.currentUser;
+app.use(cors({
+  origin: [
+    "https://vaibhav-krishi-kendra-b3d8.vercel.app",
+    "https://vaibhav-krishi-kendra.vercel.app",
+    "http://localhost:5173" 
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
 
-  // 2. If not loaded (common on refresh), wait for it
-  if (!user) {
-    user = await new Promise((resolve) => {
-      const unsubscribe = auth.onAuthStateChanged((u) => {
-        unsubscribe();
-        resolve(u);
-      });
-    });
-  }
+app.use(express.json());
 
-  // 3. Attach Token
-  if (user) {
-    const token = await user.getIdToken();
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  
-  return config;
-}, (error) => {
-  return Promise.reject(error);
-});
+// Public health check
+app.get("/", (req, res) => res.send("Vaibhav Krishi Kendra API Active 🚀"));
 
-export default API;
+// Apply verification to all /api routes
+app.use("/api/products", verifyFirebaseToken, productRoutes);
+app.use("/api/bills", verifyFirebaseToken, billRoutes);
+app.use("/api/ai", verifyFirebaseToken, aiRoutes);
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`✅ Server on port ${PORT}`));
