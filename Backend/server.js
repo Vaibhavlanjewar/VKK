@@ -31,6 +31,7 @@ app.use(cors({
     const allowedOrigins = [
       "https://vaibhav-krishi-kendra-b3d8.vercel.app",
       "https://vaibhav-krishi-kendra.vercel.app",
+      "https://vkk-ucbn.vercel.app"
     ];
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
