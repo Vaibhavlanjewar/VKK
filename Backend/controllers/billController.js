@@ -133,7 +133,7 @@ exports.generateBillPDF = async (req, res) => {
         doc.fillColor("#ffffff").text("Product Description", 60, tableTop + 6, { bold: true });
         doc.text("Qty", 300, tableTop + 6, { bold: true });
         doc.text("Rate", 380, tableTop + 6, { bold: true });
-        doc.text("Amount", 480, tableTop + 6, { bold: true, align: 'right' });
+        doc.text("Amount", 450, tableTop + 6, { width: 90, bold: true, align: 'right' });
 
         // --- 5. TABLE ROWS ---
         let y = 235;
@@ -147,7 +147,7 @@ exports.generateBillPDF = async (req, res) => {
             doc.text(item.product, 60, y);
             doc.text(item.qty.toString(), 300, y);
             doc.text(`Rs. ${item.price.toFixed(2)}`, 380, y);
-            doc.text(`Rs. ${(item.price * item.qty).toFixed(2)}`, 480, y, { align: 'right' });
+            doc.text(`Rs. ${(item.price * item.qty).toFixed(2)}`, 450, y, { width: 90, align: 'right' });
             y += 20;
         });
 
@@ -156,14 +156,14 @@ exports.generateBillPDF = async (req, res) => {
         doc.moveTo(350, footerY).lineTo(550, footerY).stroke("#333333");
         
         doc.fontSize(10).text(`Subtotal:`, 350, footerY + 10);
-        doc.text(`Rs. ${bill.subtotal.toFixed(2)}`, 480, footerY + 10, { align: 'right' });
+        doc.text(`Rs. ${bill.subtotal.toFixed(2)}`, 350, footerY + 10, { width: 190, align: 'right' });
 
         doc.text(`GST (${bill.gstPercent}%):`, 350, footerY + 25);
-        doc.text(`Rs. ${bill.gstAmount.toFixed(2)}`, 480, footerY + 25, { align: 'right' });
+        doc.text(`Rs. ${bill.gstAmount.toFixed(2)}`, 350, footerY + 25, { width: 190, align: 'right' });
 
         doc.rect(350, footerY + 40, 200, 25).fill("#1e5128").stroke();
         doc.fillColor("#ffffff").fontSize(12).text(`GRAND TOTAL:`, 360, footerY + 47, { bold: true });
-        doc.text(`Rs. ${bill.total.toFixed(2)}`, 480, footerY + 47, { bold: true, align: 'right' });
+        doc.text(`Rs. ${bill.total.toFixed(2)}`, 350, footerY + 47, { width: 190, bold: true, align: 'right' });
 
         // --- 7. FOOTER & SIGNATURE ---
         doc.fillColor("#444444").fontSize(8).text("Thank you for your business!", 50, 750, { align: "center" });
