@@ -8,6 +8,7 @@ const adminEmails = [
   "pramodlanjewar@hotmail.com",
   "pramodlanjewar0101@gmail.com",
   "vnblcp@gmail.com",
+  "purvalanjewar2005@gmail.com",
   
 ];
 
